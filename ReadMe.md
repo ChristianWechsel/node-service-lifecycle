@@ -25,10 +25,32 @@ The endpoint responds with `200` and `{ "status": "ok" }` when healthy, or `503`
 
 A failed check changes the status to `not-ok`; once all registered checks succeed, the status automatically returns to `ok`. When no checks are registered, `getStatus()` leaves a status set manually with `health.setStatus(...)` unchanged. You can also register a callback with `health.onStatusChange(...)` and append/read diagnostic entries with `health.addLog(...)` and `health.getLog()`.
 
+## Using Shutdown
+
+`Shutdown` runs registered handlers sequentially in the order they were registered with `registerHandler(...)`. Each handler is awaited before the next one starts, so registration order implicitly defines the shutdown sequence. Use this ordering when cleanup steps depend on one another. For example, stop a consumer before closing the database connection it uses:
+
+```ts
+import { Shutdown } from "@christian-wechsel/node-service-lifecycle";
+
+const shutdown = new Shutdown(logger, health);
+
+shutdown.registerHandler(async ({ logger }) => {
+   logger.info("Stopping consumer");
+   await consumer.stop();
+});
+
+shutdown.registerHandler(async ({ logger }) => {
+   logger.info("Closing database connection");
+   await database.close();
+});
+
+shutdown.registerShutdownAtProcess();
+```
+
+Each handler receives an object containing the received `signal` (`SIGTERM` or `SIGINT`) and the configured `logger`. `registerShutdownAtProcess()` installs listeners for both signals. On the first signal, `Shutdown` marks the service as `not-ok`, awaits the handlers in registration order, and then exits. If a handler rejects, later handlers are not run, the process exit code is set to `1`, and shutdown continues. Additional signals received while shutdown is in progress are logged and do not start the handlers again.
+
 ---
 
 ## License
 
 [MIT](LICENSE)
-
-> **Note:** Update the [LICENSE](LICENSE) file manually with the current year and your name or organization (replace `<YEAR>` and `<AUTHOR_OR_ORGANIZATION>`).
