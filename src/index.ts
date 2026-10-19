@@ -1,3 +1,1 @@
-console.log("Hello World!");
-
-export { add } from "./math/add.js";
+export { Health } from "./health/health.js";

@@ -19,26 +19,50 @@ A production-ready TypeScript library package pre-configured with strict TypeScr
 
 ```text
 ├── bin/
-│   └── clean.sh                 # Cleans dist/ build outputs
+│   └── clean.sh                  # Cleans dist/ build outputs
 ├── src/
-│   ├── index.ts                 # Library entry point (public exports)
-│   ├── math/                    # Example domain module
-│   │   ├── add.ts               # Sample function
-│   │   ├── add.testdata.ts      # Test data fixtures
-│   │   └── add.test.unit.ts     # Unit test suite
-│   └── integration/             # Integration test directory
-│       └── add.test.int.ts      # Integration test suite
-├── cloudbuild.yaml              # Cloud Build pipeline configuration
-├── jest.config.mjs              # Jest configuration with project suites
-├── main.tf                      # Terraform Cloud Build triggers
-├── package.json                 # Package manifest, scripts, and dependencies
-├── provider.tf                  # Terraform Google provider config
-├── terraform.tfvars.example     # Example variable values for Terraform
-├── tsconfig.json                # Base TypeScript configuration
-├── tsconfig.prod.json           # Production build configuration
-├── tsconfig.test.json           # Test build configuration
-└── variables.tf                 # Terraform variable definitions
+│   ├── index.ts                  # Library entry point (public exports)
+│   └── health/
+│       ├── health.ts             # Health status and check implementation
+│       └── health.test.unit.ts   # Unit tests
+├── cloudbuild.yaml               # Cloud Build pipeline configuration
+├── jest.config.mjs               # Jest configuration
+├── main.tf                       # Terraform Cloud Build triggers
+├── package.json                  # Package manifest, scripts, and dependencies
+├── provider.tf                   # Terraform Google provider config
+├── terraform.tfvars.example      # Example variable values for Terraform
+├── tsconfig.json                 # Base TypeScript configuration
+├── tsconfig.prod.json            # Production build configuration
+├── tsconfig.test.json             # Test build configuration
+└── variables.tf                  # Terraform variable definitions
 ```
+
+## Using Health
+
+`Health` provides a status for an application and can run asynchronous checks whenever the status is requested. Create one instance during application startup, register checks for dependencies that matter to your service, and expose its status through your server's health endpoint.
+
+```ts
+import express from "express";
+import { Health } from "@christian-wechsel/node-service-lifecycle";
+
+const app = express();
+const health = new Health();
+
+health.addChecks(async () => {
+   // Return true when the dependency is reachable and usable.
+   return database.ping();
+});
+
+app.get("/health", async (_req, res) => {
+   const status = await health.getStatus();
+   res.status(status === "ok" ? 200 : 503);
+   res.json({ status });
+});
+```
+
+The endpoint responds with `200` and `{ "status": "ok" }` when healthy, or `503` and `{ "status": "not-ok" }` when unhealthy. `getStatus()` runs all registered checks on every request. With no checks registered, the initial status is `ok`. A check should resolve to `false` when its dependency is unhealthy; if a check rejects, `getStatus()` rejects as well, so handle that error in your server according to your Express version and error-handling setup.
+
+A failed check changes the status to `not-ok`. Later successful checks do not automatically restore it to `ok`; if your application needs recovery behavior, call `health.setStatus("ok")` when recovery has been confirmed. You can also use `health.setStatus("not-ok")` to report an application-level failure, register a callback with `health.onStatusChange(...)`, and append/read diagnostic entries with `health.addLog(...)` and `health.getLog()`.
 
 ---
 
