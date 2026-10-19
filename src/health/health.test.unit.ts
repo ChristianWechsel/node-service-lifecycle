@@ -93,6 +93,20 @@ describe("Health", () => {
       expect(await health.getStatus()).toBe("not-ok");
     });
 
+    it("returns to ok when all checks succeed after failing", async () => {
+      const callback = jest.fn();
+      const check = jest
+        .fn()
+        .mockResolvedValueOnce(false)
+        .mockResolvedValueOnce(true);
+      health.onStatusChange(callback);
+      health.addChecks(check);
+
+      expect(await health.getStatus()).toBe("not-ok");
+      expect(await health.getStatus()).toBe("ok");
+      expect(callback.mock.calls).toEqual([["not-ok"], ["ok"]]);
+    });
+
     it("runs every registered check on each status request", async () => {
       const check = jest.fn().mockResolvedValue(true);
       health.addChecks(check);

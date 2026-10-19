@@ -15,10 +15,10 @@ export class Health {
 
   async getStatus(): Promise<HealthStatus> {
     const results = await Promise.all(this.checks.map((check) => check()));
-    if (results.includes(false)) {
-      this.setStatus("not-ok");
+    if (this.checks.length > 0) {
+      this.setStatus(results.includes(false) ? "not-ok" : "ok");
     }
-    return Promise.resolve(this.status);
+    return this.status;
   }
 
   setStatus(status: HealthStatus): void {
